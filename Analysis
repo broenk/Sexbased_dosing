@@ -102,3 +102,11 @@ dif <- data.frame("P" = m10$P, "m10" = m10$Date_dif, "m50" = m50$Date_dif, "m100
 
 kbl(dif,  col.names = c("Proportion of Dose Women Recieve","10 Million Doses", "50 Million Doses", "100 Million Doses", "150 Million Doses")) %>%
   kable_styling(bootstrap_options = "striped")
+
+
+data_wide <- spread(dose_df, P, Dif)
+
+kbl(data_wide, digits =0) %>%
+  kable_styling(bootstrap_options = "striped") %>%
+  add_header_above(c(" " = 1, "Proportion of Standard Dose Women Recieve" = 10))
+
