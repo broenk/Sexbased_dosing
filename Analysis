@@ -1,0 +1,104 @@
+require(lubridate)
+require(readr)
+require(tidyverse)
+require(kableExtra)
+
+###Read in vaccine data
+vaccines <- read.csv("path/COVID-19_Vaccination_Demographics_in_the_United_States_National.csv") %>%
+  filter(Demographic_category == "Sex_Female" | Demographic_category == "Sex_Male") %>%
+  mutate(Date = as_date(Date, format = "%m/%d/%Y"))
+
+###Plot vaccination rates by sex over time
+ggplot()+
+  geom_line(data = vaccines, aes(x = Date, y = Administered_Dose1, group = Demographic_category, color = Demographic_category))+
+  theme_bw()+
+  scale_color_manual(labels= c("Female", "Male"), values = c("Blue", "Red"))+
+  labs(y = "1st Dose", color = "Sex")
+
+##Plot available doses over time (assuming all available doses are given)
+all_available <- vaccines %>%
+  group_by(Date) %>%
+  summarise(doses = sum (Administered_Dose1))
+
+ggplot()+
+  geom_line(data = all_available, aes(x = Date, y = doses))+
+  theme_bw()+
+  labs(y = "Available 1st Doses")
+
+###What if women required a different proportion of vaccine dose compared to men?
+
+###p = proportion of dose required
+p <- seq(.1,1, .1)
+
+###Get a data frame where women recieve a lower dose and get the total number of availabl doses
+test_df <- list()
+full_df <- data.frame()
+for(i in 1:10){
+  test_df[[i]] <- vaccines %>%
+    mutate(Available_doses = ifelse(Demographic_category == "Sex_Female", Administered_Dose1*1/p[i], Administered_Dose1),
+           "P" = p[i]) %>%
+    group_by(Date,P) %>%
+    summarise(doses = sum (Available_doses))
+full_df <- rbind(full_df, test_df[[i]])
+}
+
+ggplot()+
+  geom_line(data = full_df, aes(x = Date, y = doses, group = P, color = as.factor(P)))+
+  theme_bw()+
+  labs(y = "Available Doses")+ 
+  scale_color_discrete(name = "Percent of Standard\nDose Women Receive", labels = c("10%", "20%", "30%", "40%", "50%", "60%", "70%","80%","90%","100%"))
+
+
+###Difference in available doses at different times
+test_dates <- as_date(c("2021-01-01", "2021-02-01", "2021-03-01","2021-04-01","2021-05-01","2021-06-01","2021-07-01","2021-08-01"))
+dose_dif <-list(c())
+dose_df <- c()
+
+for(i in 1:10){
+    dose_dif[[i]] <- data.frame("Dif" = test_df[[i]]$doses[test_df[[i]]$Date %in% test_dates] - test_df[[10]]$doses[test_df[[10]]$Date %in% test_dates], "P" = p[i], "Date" = test_dates)
+    dose_df <- rbind(dose_df, dose_dif[[i]])
+    }
+
+
+ggplot()+
+  geom_line(data = dose_df, aes(x = Date, y = Dif, group = P, color = as.factor(P)))+
+  theme_bw() +
+  labs(x = "Date", y = "Difference in Available Doses")+
+  scale_color_discrete(name = "Percent of Standard\nDose Women Receive", labels = c("10%", "20%", "30%", "40%", "50%", "60%","70%","80%","90%","100%"))
+
+
+####Get dates for specific dose milestones
+mil_10 <- c()
+mil_50 <- c()
+mil_100 <- c() 
+mil_150 <- c() 
+
+m10 <- data.frame()
+m50 <- data.frame()
+m100 <- data.frame()
+m150 <- data.frame()
+
+
+for(i in 1:10) {
+  mil_10[[i]]<- test_df[[i]][which.min(abs(test_df[[i]]$doses-10000000)),]
+  mil_50[[i]] <- test_df[[i]][which.min(abs(test_df[[i]]$doses-50000000)),]
+  mil_100[[i]]<- test_df[[i]][which.min(abs(test_df[[i]]$doses-100000000)),]
+  mil_150[[i]]<- test_df[[i]][which.min(abs(test_df[[i]]$doses-150000000)),]
+  
+  m10 <- rbind(m10, mil_10[[i]])
+  m50 <- rbind(m50, mil_50[[i]])
+  m100 <- rbind(m100, mil_100[[i]])
+  m150 <- rbind(m150, mil_150[[i]])
+  
+  }
+
+m10$Date_dif = m10$Date - m10$Date[10]
+m50$Date_dif = m50$Date - m50$Date[10]
+m100$Date_dif = m100$Date - m100$Date[10]
+m150$Date_dif = m150$Date - m150$Date[10]
+
+
+dif <- data.frame("P" = m10$P, "m10" = m10$Date_dif, "m50" = m50$Date_dif, "m100" = m100$Date_dif, "m150" = m150$Date_dif)
+
+kbl(dif,  col.names = c("Proportion of Dose Women Recieve","10 Million Doses", "50 Million Doses", "100 Million Doses", "150 Million Doses")) %>%
+  kable_styling(bootstrap_options = "striped")
